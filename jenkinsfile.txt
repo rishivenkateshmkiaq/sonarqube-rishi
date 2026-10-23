@@ -1,0 +1,62 @@
+pipeline {
+    agent any
+ 
+    stages {
+        stage('Checkout and Prepare') {
+            steps {
+                sh '''
+                    mkdir -p src
+ 
+                    cat > src/Hello.java <<'EOF'
+public class Hello {
+    public static void main(String[] args) {
+        System.out.println("Hello from Jenkins and SonarQube");
+    }
+}
+EOF
+ 
+                    cat > sonar-project.properties <<'EOF'
+sonar.projectKey=local-sonar-demo
+sonar.projectName=Local Sonar Demo
+sonar.sources=src
+sonar.sourceEncoding=UTF-8
+EOF
+                '''
+            }
+        }
+ 
+        stage('Verify SonarScanner') {
+            steps {
+                sh '/opt/sonar-scanner/bin/sonar-scanner --version'
+            }
+        }
+ 
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('LocalSonarQube') {
+                    withCredentials([
+                        string(
+                            credentialsId: 'sonar-token',
+                            variable: 'SONAR_TOKEN'
+                        )
+                    ]) {
+                        sh '''
+                            /opt/sonar-scanner/bin/sonar-scanner \
+                              -Dsonar.host.url=http://localhost:9000 \
+                              -Dsonar.token="$SONAR_TOKEN"
+                        '''
+                    }
+                }
+            }
+        }
+    }
+ 
+    post {
+        success {
+            echo 'SonarQube analysis completed successfully.'
+        }
+        failure {
+            echo 'Pipeline failed. Check Console Output.'
+        }
+    }
+}
